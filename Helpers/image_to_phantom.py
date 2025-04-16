@@ -4,6 +4,7 @@ import numpy as np
 import os
 from PIL import Image, ImageFilter
 from scipy.ndimage import label
+import matplotlib.pyplot as plt
 
 
 # %%
