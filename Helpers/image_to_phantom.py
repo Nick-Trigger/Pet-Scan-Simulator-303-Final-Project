@@ -10,6 +10,7 @@ import matplotlib.pyplot as plt
 # %%
 # {name : [image_path, whitematter_color, graymatter_color]}
 def get_image_info():
+    print("{name : [image_path, whitematter_color, graymatter_color]}")
     return {
     'CoronalBrain1' : ['../BrainImages/CoronalBrain1.png', (245, 189, 157), (216, 147, 113)],
     'CoronalBrain2' : ['../BrainImages/CoronalBrain2.png', (250, 202, 182), (211, 153, 119)],
@@ -21,13 +22,13 @@ def get_image_info():
 
 # %%
 ## Convert image to phantom
-def img_to_phantom(img_path, name, whitematter_color, graymatter_color, background_val, whitematter_val, graymatter_val, csf_val, tolerance_pct = 8, brain_bound_padding = 10, blur_radius = 5, dbg = False):
+def img_to_phantom(img_path, name, whitematter_color, graymatter_color, background_val, whitematter_val, graymatter_val, csf_val, p_whitematter_val, p_graymatter_val, p_csf_val, tumor_params = None, tolerance_pct = 8, brain_bound_padding = 10, blur_radius = 5, dbg = False):
     
     ## -------------------------------------------------
     ## Check if the phantom already exists
     ## -------------------------------------------------
     
-    query = f"{name}__{tolerance_pct}_{brain_bound_padding}_{background_val}_{whitematter_val}_{graymatter_val}_{csf_val}_b_{blur_radius}"
+    query = f"{name}__{tolerance_pct}_{brain_bound_padding}_{background_val}_{whitematter_val}_{graymatter_val}_{csf_val}_{p_whitematter_val}_{p_graymatter_val}_{p_csf_val}_b_{blur_radius}_t_{tumor_params}"
     
     if os.path.exists(f'../BrainPhantoms/{query}.npy'):
         if not dbg:
@@ -135,5 +136,3 @@ def create_oval(arr, x, y, w, h, val):
     y_g, x_g = np.ogrid[-y:rows - y, -x:cols - x]
     mask = (x_g**2 / (w / 2)**2) + (y_g**2 / (h / 2)**2) <= 1
     arr[mask] = val
-
-
