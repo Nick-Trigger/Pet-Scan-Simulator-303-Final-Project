@@ -10,7 +10,6 @@ import matplotlib.pyplot as plt
 # %%
 # {name : [image_path, whitematter_color, graymatter_color]}
 def get_image_info():
-    print("{name : [image_path, whitematter_color, graymatter_color]}")
     return {
     'CoronalBrain1' : ['./BrainImages/CoronalBrain1.png', (245, 189, 157), (216, 147, 113)],
     'CoronalBrain2' : ['./BrainImages/CoronalBrain2.png', (250, 202, 182), (211, 153, 119)],
