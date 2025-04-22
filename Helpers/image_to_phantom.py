@@ -1,49 +1,95 @@
-
 # %%import matplotlib.pyplot as plt
 import numpy as np
 import os
 from PIL import Image, ImageFilter
 from scipy.ndimage import label
 import matplotlib.pyplot as plt
+from skimage.transform import rotate, radon, iradon
 
 
 # %%
 # {name : [image_path, whitematter_color, graymatter_color]}
 def get_image_info():
     return {
-    'CoronalBrain1' : ['./BrainImages/CoronalBrain1.png', (245, 189, 157), (216, 147, 113)],
-    'CoronalBrain2' : ['./BrainImages/CoronalBrain2.png', (250, 202, 182), (211, 153, 119)],
-    'CoronalBrain3' : ['./BrainImages/CoronalBrain3.png', (243, 191, 162), (215, 152, 116)],
-    'HorizontalBrain1' : ['./BrainImages/HorizontalBrain1.png', (234, 172, 136), (206, 137, 101)],
-    'HorizontalBrain2' : ['./BrainImages/HorizontalBrain2.png', (219, 162, 135), (193, 134, 105)],
-    'HorizontalBrain3' : ['./BrainImages/HorizontalBrain3.png', (237, 178, 149), (206, 142, 109)]
-}
+        "CoronalBrain1": [
+            "./BrainImages/CoronalBrain1.png",
+            (245, 189, 157),
+            (216, 147, 113),
+        ],
+        "CoronalBrain2": [
+            "./BrainImages/CoronalBrain2.png",
+            (250, 202, 182),
+            (211, 153, 119),
+        ],
+        "CoronalBrain3": [
+            "./BrainImages/CoronalBrain3.png",
+            (243, 191, 162),
+            (215, 152, 116),
+        ],
+        "HorizontalBrain1": [
+            "./BrainImages/HorizontalBrain1.png",
+            (234, 172, 136),
+            (206, 137, 101),
+        ],
+        "HorizontalBrain2": [
+            "./BrainImages/HorizontalBrain2.png",
+            (219, 162, 135),
+            (193, 134, 105),
+        ],
+        "HorizontalBrain3": [
+            "./BrainImages/HorizontalBrain3.png",
+            (237, 178, 149),
+            (206, 142, 109),
+        ],
+    }
+
 
 # %%
 ## Convert image to phantom
-def img_to_phantom(img_path, name, whitematter_color, graymatter_color, background_val, whitematter_val, graymatter_val, csf_val, p_whitematter_val, p_graymatter_val, p_csf_val, tumor_params = None, tolerance_pct = 8, brain_bound_padding = 10, blur_radius = 5, dbg = False, fileloc = '../BrainPhantoms/'):
-    
+def img_to_phantom(
+    img_path,
+    name,
+    whitematter_color,
+    graymatter_color,
+    background_val,
+    whitematter_val,
+    graymatter_val,
+    csf_val,
+    p_whitematter_val,
+    p_graymatter_val,
+    p_csf_val,
+    tumor_params=None,
+    tolerance_pct=8,
+    brain_bound_padding=10,
+    blur_radius=5,
+    dbg=False,
+    fileloc="../BrainPhantoms/",
+):
     ## -------------------------------------------------
     ## Check if the phantom already exists
     ## -------------------------------------------------
-    
+
     query = f"{name}__{tolerance_pct}_{brain_bound_padding}_{background_val}_{whitematter_val}_{graymatter_val}_{csf_val}_{p_whitematter_val}_{p_graymatter_val}_{p_csf_val}_b_{blur_radius}_t_{tumor_params}"
-    
-    if os.path.exists(f'{fileloc}{query}.npy'):
+
+    if os.path.exists(f"{fileloc}{query}.npy"):
         if not dbg:
-            return np.load(f'{fileloc}{query}.npy'), query
-    
+            return np.load(f"{fileloc}{query}.npy"), query
+
     ## -------------------------------------------------
     ## Load the image & remove the number from the top left corner
     ## -------------------------------------------------
 
-    img = Image.open(img_path).convert('RGBA')
+    img = Image.open(img_path).convert("RGBA")
     r, g, b, _ = img.split()
 
     # Remove the number from top left corner of the image
     for x in range(img.width):
-        for y in range(img.height): 
-            if r.getpixel((x, y)) == 248 and g.getpixel((x, y)) == 248 and b.getpixel((x, y)) == 248:
+        for y in range(img.height):
+            if (
+                r.getpixel((x, y)) == 248
+                and g.getpixel((x, y)) == 248
+                and b.getpixel((x, y)) == 248
+            ):
                 img.putpixel((x, y), (0, 0, 0, 0))
 
     r, g, b, a = img.split()
@@ -51,48 +97,71 @@ def img_to_phantom(img_path, name, whitematter_color, graymatter_color, backgrou
     ## -------------------------------------------------
     ## Find whitematter and gray matter pixels
     ## -------------------------------------------------
-    
+
     whitematter_img = Image.new("L", img.size, 0)
     graymatter_img = Image.new("L", img.size, 0)
-    
+
     for x in range(img.width):
         for y in range(img.height):
-            is_whitematter_r = whitematter_color[0] - tolerance_pct*whitematter_color[0]/100 <= r.getpixel((x, y)) <= whitematter_color[0] + tolerance_pct*whitematter_color[0]/100
-            is_whitematter_g = whitematter_color[1] - tolerance_pct*whitematter_color[1]/100 <= g.getpixel((x, y)) <= whitematter_color[1] + tolerance_pct*whitematter_color[1]/100
-            is_whitematter_b = whitematter_color[2] - tolerance_pct*whitematter_color[2]/100 <= b.getpixel((x, y)) <= whitematter_color[2] + tolerance_pct*whitematter_color[2]/100
-            
-            is_graymatter_r = graymatter_color[0] - tolerance_pct*graymatter_color[0]/100 <= r.getpixel((x, y)) <= graymatter_color[0] + tolerance_pct*graymatter_color[0]/100
-            is_graymatter_g = graymatter_color[1] - tolerance_pct*graymatter_color[1]/100 <= g.getpixel((x, y)) <= graymatter_color[1] + tolerance_pct*graymatter_color[1]/100
-            is_graymatter_b = graymatter_color[2] - tolerance_pct*graymatter_color[2]/100 <= b.getpixel((x, y)) <= graymatter_color[2] + tolerance_pct*graymatter_color[2]/100
-            
+            is_whitematter_r = (
+                whitematter_color[0] - tolerance_pct * whitematter_color[0] / 100
+                <= r.getpixel((x, y))
+                <= whitematter_color[0] + tolerance_pct * whitematter_color[0] / 100
+            )
+            is_whitematter_g = (
+                whitematter_color[1] - tolerance_pct * whitematter_color[1] / 100
+                <= g.getpixel((x, y))
+                <= whitematter_color[1] + tolerance_pct * whitematter_color[1] / 100
+            )
+            is_whitematter_b = (
+                whitematter_color[2] - tolerance_pct * whitematter_color[2] / 100
+                <= b.getpixel((x, y))
+                <= whitematter_color[2] + tolerance_pct * whitematter_color[2] / 100
+            )
+
+            is_graymatter_r = (
+                graymatter_color[0] - tolerance_pct * graymatter_color[0] / 100
+                <= r.getpixel((x, y))
+                <= graymatter_color[0] + tolerance_pct * graymatter_color[0] / 100
+            )
+            is_graymatter_g = (
+                graymatter_color[1] - tolerance_pct * graymatter_color[1] / 100
+                <= g.getpixel((x, y))
+                <= graymatter_color[1] + tolerance_pct * graymatter_color[1] / 100
+            )
+            is_graymatter_b = (
+                graymatter_color[2] - tolerance_pct * graymatter_color[2] / 100
+                <= b.getpixel((x, y))
+                <= graymatter_color[2] + tolerance_pct * graymatter_color[2] / 100
+            )
+
             if is_whitematter_r and is_whitematter_g and is_whitematter_b:
-                whitematter_img.putpixel((x, y), 1) 
+                whitematter_img.putpixel((x, y), 1)
             elif is_graymatter_r and is_graymatter_g and is_graymatter_b:
-                graymatter_img.putpixel((x, y), 1) 
-    
+                graymatter_img.putpixel((x, y), 1)
+
     whitematter_array = np.array(whitematter_img)
     graymatter_array = np.array(graymatter_img)
-    
-    #make copies for PET phantoms
+
+    # make copies for PET phantoms
     p_whitematter_array = whitematter_array.copy() * p_whitematter_val
     p_graymatter_array = graymatter_array.copy() * p_graymatter_val
-    
-    #assign values to CT phantoms
+
+    # assign values to CT phantoms
     whitematter_array = whitematter_array * whitematter_val
     graymatter_array = graymatter_array * graymatter_val
-    
-    wg_array = np.add(whitematter_array, graymatter_array) # Combine the two arrays
+
+    wg_array = np.add(whitematter_array, graymatter_array)  # Combine the two arrays
     ## -------------------------------------------------
     ## Set CSF pixels
     ## -------------------------------------------------
-    
-    rows, cols = np.where(wg_array != 0) # find the size of the brain
+
+    rows, cols = np.where(wg_array != 0)  # find the size of the brain
     min_x = np.min(cols) - brain_bound_padding
     max_y = np.max(rows) + brain_bound_padding
     max_x = np.max(cols) + brain_bound_padding
     min_y = np.min(rows) - brain_bound_padding
-    
-    
+
     # CSF ooval
     background_array = np.zeros_like(wg_array)
     center_x = (min_x + max_x) // 2
@@ -102,14 +171,16 @@ def img_to_phantom(img_path, name, whitematter_color, graymatter_color, backgrou
     create_oval(background_array, center_x, center_y, width, height, 1)
     csf_array = background_array.copy()  # Get the oval
     csf_array[wg_array != 0] = 0  # Ensure no overlap with brain
-    
-    
+
     p_csf_array = csf_array.copy()  # Make a copy for PET phantoms
     csf_array = csf_array * csf_val  # Assign CSF value
 
     if dbg:
-        for image, title in zip([csf_array, whitematter_array, graymatter_array, background_array], ['CSF Layer', 'Whitematter Layer', 'Graymatter Layer', 'BKG Layer']):
-            plt.imshow(image, cmap='gray')
+        for image, title in zip(
+            [csf_array, whitematter_array, graymatter_array, background_array],
+            ["CSF Layer", "Whitematter Layer", "Graymatter Layer", "BKG Layer"],
+        ):
+            plt.imshow(image, cmap="gray")
             plt.title(title)
             plt.show()
             print(f"Max value in {title}: {np.max(image)}")
@@ -120,67 +191,113 @@ def img_to_phantom(img_path, name, whitematter_color, graymatter_color, backgrou
     ## add blur to each layer
     ## -------------------------------------------------
     # CT
-    whitematter_array = Image.fromarray(whitematter_array.astype(np.uint8)).filter(ImageFilter.GaussianBlur(radius=blur_radius))
-    graymatter_array = Image.fromarray(graymatter_array.astype(np.uint8)).filter(ImageFilter.GaussianBlur(radius=blur_radius))
-    csf_array = Image.fromarray(csf_array.astype(np.uint8)).filter(ImageFilter.GaussianBlur(radius=blur_radius))
+    whitematter_array = Image.fromarray(whitematter_array.astype(np.uint8)).filter(
+        ImageFilter.GaussianBlur(radius=blur_radius)
+    )
+    graymatter_array = Image.fromarray(graymatter_array.astype(np.uint8)).filter(
+        ImageFilter.GaussianBlur(radius=blur_radius)
+    )
+    csf_array = Image.fromarray(csf_array.astype(np.uint8)).filter(
+        ImageFilter.GaussianBlur(radius=blur_radius)
+    )
 
     whitematter_array = np.array(whitematter_array)
     graymatter_array = np.array(graymatter_array)
     csf_array = np.array(csf_array)
 
     # PET
-    p_whitematter_array = Image.fromarray(p_whitematter_array.astype(np.uint8)).filter(ImageFilter.GaussianBlur(radius=blur_radius))
-    p_graymatter_array = Image.fromarray(p_graymatter_array.astype(np.uint8)).filter(ImageFilter.GaussianBlur(radius=blur_radius))
-    p_csf_array = Image.fromarray(p_csf_array.astype(np.uint8)).filter(ImageFilter.GaussianBlur(radius=blur_radius))
+    p_whitematter_array = Image.fromarray(p_whitematter_array.astype(np.uint8)).filter(
+        ImageFilter.GaussianBlur(radius=blur_radius)
+    )
+    p_graymatter_array = Image.fromarray(p_graymatter_array.astype(np.uint8)).filter(
+        ImageFilter.GaussianBlur(radius=blur_radius)
+    )
+    p_csf_array = Image.fromarray(p_csf_array.astype(np.uint8)).filter(
+        ImageFilter.GaussianBlur(radius=blur_radius)
+    )
 
     p_whitematter_array = np.array(p_whitematter_array)
     p_graymatter_array = np.array(p_graymatter_array)
     p_csf_array = np.array(p_csf_array)
-    
+
     ## -------------------------------------------------
     ## Add tumor if specified
     ## -------------------------------------------------
-    
+
     if tumor_params is not None:
         x, y, w, h, val, p_val = tumor_params
         tumor_array = np.zeros_like(whitematter_array)
         create_oval(tumor_array, x, y, w, h, val)
-        
+
         p_tumor_array = np.zeros_like(p_whitematter_array)
         create_oval(p_tumor_array, x, y, w, h, p_val)
 
-        tumor_array = Image.fromarray(tumor_array).filter(ImageFilter.GaussianBlur(radius=blur_radius))
+        tumor_array = Image.fromarray(tumor_array).filter(
+            ImageFilter.GaussianBlur(radius=blur_radius)
+        )
         tumor_array = np.array(tumor_array)
-        
-        p_tumor_array = Image.fromarray(p_tumor_array).filter(ImageFilter.GaussianBlur(radius=blur_radius))
+
+        p_tumor_array = Image.fromarray(p_tumor_array).filter(
+            ImageFilter.GaussianBlur(radius=blur_radius)
+        )
         p_tumor_array = np.array(p_tumor_array)
 
-    
     ## -------------------------------------------------
     ## Combine the layers
     ## -------------------------------------------------
-    
+
     result_ct = whitematter_array + graymatter_array + csf_array
     if tumor_params is not None:
         result_ct += tumor_array
     result_ct = np.array(result_ct)
-    
-    result_pet = p_whitematter_array + p_graymatter_array + p_csf_array 
+
+    result_pet = p_whitematter_array + p_graymatter_array + p_csf_array
     if tumor_params is not None:
         result_pet += p_tumor_array
     result_pet = np.array(result_pet)
-    
+
     result = [result_ct, result_pet]
-    
+
     if not dbg:
-        np.save(f'{fileloc}{query}.npy', result) # Save the phantom
-    
+        np.save(f"{fileloc}{query}.npy", result)  # Save the phantom
+
     return result, query
 
 
 # %%
 def create_oval(arr, x, y, w, h, val):
     rows, cols = arr.shape
-    y_g, x_g = np.ogrid[-y:rows - y, -x:cols - x]
-    mask = (x_g**2 / (w / 2)**2) + (y_g**2 / (h / 2)**2) <= 1
+    y_g, x_g = np.ogrid[-y : rows - y, -x : cols - x]
+    mask = (x_g**2 / (w / 2) ** 2) + (y_g**2 / (h / 2) ** 2) <= 1
     arr[mask] = val
+
+
+def pet_sim(image, emissions, blank):
+    blank_sinogram = radon(blank)
+    for i in range(len(image)):
+        for j in range(len(image[0])):
+            lines = int(np.round(image[i, j] / image.max() * emissions))
+            for k in range(lines):
+                angle = np.random.randint(0, 180)
+                theta = np.deg2rad(angle)
+                height, width = image.shape
+                y = i - height / 2
+                x = j - width / 2
+                l = int(np.round(x * np.cos(theta) + y * np.sin(theta)))
+                l_index = l + blank_sinogram.shape[0] // 2
+                if 0 <= l_index < blank_sinogram.shape[0]:
+                    blank_sinogram[l_index, angle] += 1
+
+    return blank_sinogram
+
+
+img_data = pet_sim(np.ones((100, 100)), 100, np.zeros((100, 100)))
+img_data = np.clip(img_data, 0, 255).astype(np.uint8)
+img = Image.fromarray(img_data)
+img2 = iradon(np.array(img))
+img2 = np.clip(img2, 0, 255).astype(np.uint8)
+max = np.max(img2)
+min = np.min(img2)
+img2 = ((img2 - min) / (max - min)) * 255
+img2 = Image.fromarray(img2)
+img.save("phan.png")
