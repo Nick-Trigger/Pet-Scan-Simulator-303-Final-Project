@@ -5,7 +5,7 @@ from PIL import Image, ImageFilter
 from scipy.ndimage import label
 import matplotlib.pyplot as plt
 from skimage.transform import rotate, radon, iradon
-
+from tqdm import tqdm
 
 # %%
 # {name : [image_path, whitematter_color, graymatter_color]}
@@ -272,32 +272,24 @@ def create_oval(arr, x, y, w, h, val):
     arr[mask] = val
 
 
-def pet_sim(image, emissions, blank):
-    blank_sinogram = radon(blank)
-    for i in range(len(image)):
-        for j in range(len(image[0])):
-            lines = int(np.round(image[i, j] / image.max() * emissions))
-            for k in range(lines):
-                angle = np.random.randint(0, 180)
-                theta = np.deg2rad(angle)
-                height, width = image.shape
-                y = i - height / 2
-                x = j - width / 2
-                l = int(np.round(x * np.cos(theta) + y * np.sin(theta)))
-                l_index = l + blank_sinogram.shape[0] // 2
-                if 0 <= l_index < blank_sinogram.shape[0]:
-                    blank_sinogram[l_index, angle] += 1
+def pet_sim(image, emissions):
+    # Generate Poisson-distributed emissions
+    poisson_emissions = np.random.poisson(emissions, size=image.shape)
+    emission_image = image * emissions
+    
+    sinogram = radon(emission_image)
+    output = iradon(sinogram, filter_name="hann", circle=True)
 
-    return blank_sinogram
+    return sinogram, output
 
 
-img_data = pet_sim(np.ones((100, 100)), 1, np.zeros((100, 100)))
-img_data = np.clip(img_data, 0, 255).astype(np.uint8)
-img = Image.fromarray(img_data)
-img2 = iradon(np.array(img))
-max = np.max(img2)
-min = np.min(img2)
-img2 = ((img2 - min) / (max - min)) * 255
-img2 = np.clip(img2, 0, 255).astype(np.uint8)
-img2 = Image.fromarray(img2)
-img2.save("phan.png")
+# img_data = pet_sim(np.ones((100, 100)), 1, np.zeros((100, 100)))
+# img_data = np.clip(img_data, 0, 255).astype(np.uint8)
+# img = Image.fromarray(img_data)
+# img2 = iradon(np.array(img))
+# max = np.max(img2)
+# min = np.min(img2)
+# img2 = ((img2 - min) / (max - min)) * 255
+# img2 = np.clip(img2, 0, 255).astype(np.uint8)
+# img2 = Image.fromarray(img2)
+# img2.save("phan.png")
