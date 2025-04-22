@@ -92,6 +92,16 @@ def img_to_phantom(
             ):
                 img.putpixel((x, y), (0, 0, 0, 0))
 
+## -------------------------------------------------
+## Pad the y directions
+## -------------------------------------------------
+    rows_to_add = img.width - img.height
+    
+    new_img = Image.new("RGBA", (img.width, img.width), (0, 0, 0, 0))
+    new_img.paste(img, (0, rows_to_add // 2))
+    img = new_img
+        
+
     r, g, b, a = img.split()
 
     ## -------------------------------------------------
@@ -272,16 +282,26 @@ def create_oval(arr, x, y, w, h, val):
     arr[mask] = val
 
 
-def pet_sim(image, emissions):
-    # Generate Poisson-distributed emissions
-    poisson_emissions = np.random.poisson(emissions, size=image.shape)
-    emission_image = image * emissions
+# def pet_sim(image, emissions):
+#     # Generate Poisson-distributed emissions
+#     poisson_emissions = np.random.poisson(emissions, size=image.shape)
+#     emission_image = image * emissions
     
-    sinogram = radon(emission_image)
-    output = iradon(sinogram, filter_name="hann", circle=True)
+#     sinogram = radon(emission_image)
+#     output = iradon(sinogram, filter_name="hann", circle=True)
 
+#     return sinogram, output
+
+def pet_sim(image, decay, fluence, exposure_time):    
+    # Generate Poisson-distributed emissions
+    decays = np.random.poisson(image * exposure_time * decay)
+    
+    theta = np.linspace(0., 180., max(image.shape), endpoint=False)
+    sinogram = radon(decays, theta=theta)
+    
+    output = iradon(sinogram, filter_name="hamming", circle=True)
+    
     return sinogram, output
-
 
 # img_data = pet_sim(np.ones((100, 100)), 1, np.zeros((100, 100)))
 # img_data = np.clip(img_data, 0, 255).astype(np.uint8)
