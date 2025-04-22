@@ -291,13 +291,13 @@ def pet_sim(image, emissions, blank):
     return blank_sinogram
 
 
-img_data = pet_sim(np.ones((100, 100)), 100, np.zeros((100, 100)))
+img_data = pet_sim(np.ones((100, 100)), 1, np.zeros((100, 100)))
 img_data = np.clip(img_data, 0, 255).astype(np.uint8)
 img = Image.fromarray(img_data)
 img2 = iradon(np.array(img))
-img2 = np.clip(img2, 0, 255).astype(np.uint8)
 max = np.max(img2)
 min = np.min(img2)
 img2 = ((img2 - min) / (max - min)) * 255
+img2 = np.clip(img2, 0, 255).astype(np.uint8)
 img2 = Image.fromarray(img2)
-img.save("phan.png")
+img2.save("phan.png")
