@@ -58,18 +58,21 @@ def img_to_phantom(
     p_whitematter_val,
     p_graymatter_val,
     p_csf_val,
+    c_skull_val,
+    p_skull_val,
     tumor_params=None,
     tolerance_pct=8,
     brain_bound_padding=10,
     blur_radius=5,
     dbg=False,
     fileloc="../BrainPhantoms/",
+    skull_thickness=15,
 ):
     ## -------------------------------------------------
     ## Check if the phantom already exists
     ## -------------------------------------------------
 
-    query = f"{name}__{tolerance_pct}_{brain_bound_padding}_{background_val}_{whitematter_val}_{graymatter_val}_{csf_val}_{p_whitematter_val}_{p_graymatter_val}_{p_csf_val}_b_{blur_radius}_t_{tumor_params}"
+    query = f"{name}__{tolerance_pct}_{brain_bound_padding}_{background_val}_{whitematter_val}_{graymatter_val}_{csf_val}_{p_whitematter_val}_{p_graymatter_val}_{p_csf_val}_b_{blur_radius}_t_{tumor_params}_s_{skull_thickness}_{c_skull_val}_{p_skull_val}"
 
     if os.path.exists(f"{fileloc}{query}.npy"):
         if not dbg:
@@ -162,6 +165,7 @@ def img_to_phantom(
     graymatter_array = graymatter_array * graymatter_val
 
     wg_array = np.add(whitematter_array, graymatter_array)  # Combine the two arrays
+    
     ## -------------------------------------------------
     ## Set CSF pixels
     ## -------------------------------------------------
@@ -180,6 +184,7 @@ def img_to_phantom(
     height = max_y - min_y
     create_oval(background_array, center_x, center_y, width, height, 1)
     csf_array = background_array.copy()  # Get the oval
+    csf_oval = csf_array.copy()  # Make a copy for CSF
     csf_array[wg_array != 0] = 0  # Ensure no overlap with brain
 
     p_csf_array = csf_array.copy()  # Make a copy for PET phantoms
@@ -198,9 +203,22 @@ def img_to_phantom(
             print(f"Mean value in {title}: {np.mean(image)}")
 
     ## -------------------------------------------------
+    ## Add a Skull
+    ## -------------------------------------------------
+    # Create a mask for the skull
+    skull_mask = np.zeros_like(whitematter_array)
+    create_oval(
+        skull_mask, center_x, center_y, width + skull_thickness, height + skull_thickness, 1
+    )
+    skull_mask[csf_oval != 0] = 0  # Ensure no overlap with CSF
+
+    ## -------------------------------------------------
     ## add blur to each layer
     ## -------------------------------------------------
     # CT
+    skull_mask_c = skull_mask.copy() * c_skull_val
+    skull_mask_p = skull_mask.copy() * p_skull_val
+    
     whitematter_array = Image.fromarray(whitematter_array.astype(np.uint8)).filter(
         ImageFilter.GaussianBlur(radius=blur_radius)
     )
@@ -210,10 +228,15 @@ def img_to_phantom(
     csf_array = Image.fromarray(csf_array.astype(np.uint8)).filter(
         ImageFilter.GaussianBlur(radius=blur_radius)
     )
+    skull_mask = Image.fromarray(skull_mask_c.astype(np.uint8)).filter(
+        ImageFilter.GaussianBlur(radius=blur_radius)
+    )
+    
 
     whitematter_array = np.array(whitematter_array)
     graymatter_array = np.array(graymatter_array)
     csf_array = np.array(csf_array)
+    skull_mask = np.array(skull_mask)
 
     # PET
     p_whitematter_array = Image.fromarray(p_whitematter_array.astype(np.uint8)).filter(
@@ -223,6 +246,9 @@ def img_to_phantom(
         ImageFilter.GaussianBlur(radius=blur_radius)
     )
     p_csf_array = Image.fromarray(p_csf_array.astype(np.uint8)).filter(
+        ImageFilter.GaussianBlur(radius=blur_radius)
+    )
+    p_skull_mask = Image.fromarray(skull_mask_p.astype(np.uint8)).filter(
         ImageFilter.GaussianBlur(radius=blur_radius)
     )
 
@@ -256,12 +282,12 @@ def img_to_phantom(
     ## Combine the layers
     ## -------------------------------------------------
 
-    result_ct = whitematter_array + graymatter_array + csf_array
+    result_ct = whitematter_array + graymatter_array + csf_array + skull_mask
     if tumor_params is not None:
         result_ct += tumor_array
     result_ct = np.array(result_ct)
 
-    result_pet = p_whitematter_array + p_graymatter_array + p_csf_array
+    result_pet = p_whitematter_array + p_graymatter_array + p_csf_array + p_skull_mask
     if tumor_params is not None:
         result_pet += p_tumor_array
     result_pet = np.array(result_pet)
@@ -281,16 +307,6 @@ def create_oval(arr, x, y, w, h, val):
     mask = (x_g**2 / (w / 2) ** 2) + (y_g**2 / (h / 2) ** 2) <= 1
     arr[mask] = val
 
-
-# def pet_sim(image, emissions):
-#     # Generate Poisson-distributed emissions
-#     poisson_emissions = np.random.poisson(emissions, size=image.shape)
-#     emission_image = image * emissions
-    
-#     sinogram = radon(emission_image)
-#     output = iradon(sinogram, filter_name="hann", circle=True)
-
-#     return sinogram, output
 
 def pet_sim(image, decay, fluence, exposure_time):    
     # Generate Poisson-distributed emissions
