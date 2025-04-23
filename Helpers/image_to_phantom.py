@@ -69,7 +69,7 @@ def img_to_phantom( # inputs are al of the variable parameters from the GUI, and
     dbg=False,
     fileloc="../BrainPhantoms/",
     skull_thickness=15,
-)
+):
 
     ## Check if the phantom already exists
     query = f"{name}__{tolerance_pct}_{brain_bound_padding}_{background_val}_{whitematter_val}_{graymatter_val}_{csf_val}_{p_whitematter_val}_{p_graymatter_val}_{p_csf_val}_b_{blur_radius}_t_{tumor_params}_s_{skull_thickness}_{c_skull_val}_{p_skull_val}"
