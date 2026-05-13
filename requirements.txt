@@ -36,9 +36,11 @@ python-dateutil==2.9.0.post0
 pyzmq==26.4.0
 scipy==1.15.2
 six==1.17.0
+scikit-image
 stack-data==0.6.3
 tornado==6.4.2
 traitlets==5.14.3
+tqdm
 typing_extensions==4.13.2
 wcwidth==0.2.13
 widgetsnbextension==4.0.14
